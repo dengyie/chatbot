@@ -4,6 +4,8 @@ export type AppEnv = {
   wechatEncodingAesKey?: string;
   wechatAppId?: string;
   botName: string;
+  puppetToken?: string;
+  puppetType: string;
 };
 
 function readRequiredEnv(name: string): string {
@@ -28,6 +30,8 @@ export function loadEnv(): AppEnv {
     wechatToken: readRequiredEnv("WECHAT_TOKEN"),
     wechatEncodingAesKey: Bun.env.WECHAT_ENCODING_AES_KEY || undefined,
     wechatAppId: Bun.env.WECHAT_APP_ID || undefined,
-    botName: Bun.env.BOT_NAME ?? "wechat-chatbot"
+    botName: Bun.env.BOT_NAME ?? "wechat-chatbot",
+    puppetToken: Bun.env.PUPPET_TOKEN || undefined,
+    puppetType: Bun.env.PUPPET_TYPE || "wechaty-puppet-padlocal",
   };
 }
