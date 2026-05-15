@@ -26,7 +26,7 @@ export function createBot(
     console.log(`[Login] ${user.name()} 登录成功`);
   });
 
-  bot.on("logout", (user: Contact, reason: string) => {
+  bot.on("logout", (user: Contact, reason?: string) => {
     console.log(`[Logout] ${user.name()} 已登出: ${reason}`);
   });
 
