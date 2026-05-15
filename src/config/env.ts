@@ -6,6 +6,7 @@ export type AppEnv = {
   botName: string;
   puppetToken?: string;
   puppetType: string;
+  webPort?: number;
 };
 
 function readRequiredEnv(name: string): string {
@@ -33,5 +34,6 @@ export function loadEnv(): AppEnv {
     botName: Bun.env.BOT_NAME ?? "wechat-chatbot",
     puppetToken: Bun.env.PUPPET_TOKEN || undefined,
     puppetType: Bun.env.PUPPET_TYPE || "wechaty-puppet-wechat4u",
+    webPort: Number(Bun.env.WEB_PORT) || 3100,
   };
 }
