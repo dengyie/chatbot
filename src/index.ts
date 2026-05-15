@@ -1,12 +1,16 @@
 import { loadEnv } from "./config/env";
 import { createBot } from "./wechat/bot";
-import { startWebServer, broadcastMessage } from "./web/server";
+import { startWebServer, broadcastMessage, broadcastStatus } from "./web/server";
 
 const env = loadEnv();
 
-const bot = createBot(env.puppetType, env.puppetToken, env.botName, (msg) => {
-  broadcastMessage(msg);
-});
+const bot = createBot(
+  env.puppetType,
+  env.puppetToken,
+  env.botName,
+  (msg) => broadcastMessage(msg),
+  (status) => broadcastStatus(status),
+);
 
 startWebServer(env.webPort ?? 3100);
 
