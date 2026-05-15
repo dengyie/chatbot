@@ -19,6 +19,13 @@ export type StatusMessage = {
 
 export type WSMessage = ChatMessage | StatusMessage;
 
+export type HistorySync = {
+  type: "history";
+  messages: ChatMessage[];
+};
+
+const MAX_HISTORY = 200;
+const history: ChatMessage[] = [];
 const clients = new Set<ServerWebSocket<unknown>>();
 let lastStatus: StatusMessage | null = null;
 let currentQrDataUrl: string | null = null;
@@ -27,32 +34,31 @@ function sendJson(ws: ServerWebSocket<unknown>, data: unknown) {
   try { ws.send(JSON.stringify(data)); } catch { /* ignore */ }
 }
 
+function broadcastRaw(data: string) {
+  for (const ws of clients) {
+    try { ws.send(data); } catch { /* ignore */ }
+  }
+}
+
 export function broadcast(msg: WSMessage): void {
   if (msg.type === "status") {
     lastStatus = msg;
     if (msg.status === "scan" && msg.qrUrl) {
-      // Extract the WeChat login URL from the Wechaty QR page URL
       const encoded = msg.qrUrl.replace(/^.*\/qrcode\//, "");
       const wechatUrl = decodeURIComponent(encoded);
-      // Generate QR code data URL for the WeChat login URL
       QRCode.toDataURL(wechatUrl, { width: 200, margin: 1 })
         .then((dataUrl) => {
           currentQrDataUrl = dataUrl;
-          // Send updated status with qrDataUrl
-          const updated = { ...msg, qrDataUrl: dataUrl };
-          const data = JSON.stringify(updated);
-          for (const ws of clients) {
-            try { ws.send(data); } catch { /* ignore */ }
-          }
+          broadcastRaw(JSON.stringify({ ...msg, qrDataUrl: dataUrl }));
         })
         .catch((err) => console.error("[QR] 生成失败:", err));
-      // Also broadcast immediately without QR image for fast feedback
     }
   }
-  const data = JSON.stringify(msg);
-  for (const ws of clients) {
-    try { ws.send(data); } catch { /* ignore */ }
+  if (msg.type === "incoming" || msg.type === "outgoing") {
+    history.push(msg);
+    if (history.length > MAX_HISTORY) history.shift();
   }
+  broadcastRaw(JSON.stringify(msg));
 }
 
 export function broadcastMessage(msg: ChatMessage): void {
@@ -85,9 +91,10 @@ export function startWebServer(port: number): void {
     websocket: {
       open(ws) {
         clients.add(ws);
-        console.log("[Web] 客户端连接");
+        console.log(`[Web] 客户端连接 (历史消息 ${history.length} 条)`);
+        // Send history first, then current status
+        sendJson(ws, { type: "history", messages: [...history] });
         if (lastStatus) {
-          // Send cached status, with QR data URL if available
           const msg = currentQrDataUrl && lastStatus.status === "scan"
             ? { ...lastStatus, qrDataUrl: currentQrDataUrl }
             : lastStatus;

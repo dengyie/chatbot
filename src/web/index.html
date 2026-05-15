@@ -7,10 +7,14 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#ededed;height:100vh;display:flex;flex-direction:column}
-.header{background:#07c160;color:#fff;padding:12px 16px;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.header{background:#07c160;color:#fff;padding:10px 16px;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.header .left{display:flex;align-items:center;gap:8px}
 .header .dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .header .dot.off{background:#ff6b6b;animation:none}
+.header .badge{background:rgba(255,255,255,.25);font-size:12px;padding:2px 8px;border-radius:10px}
+.header .clear-btn{background:rgba(255,255,255,.2);border:none;color:#fff;font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer}
+.header .clear-btn:hover{background:rgba(255,255,255,.35)}
 #status{background:#fff;padding:12px 16px;border-bottom:1px solid #e0e0e0;display:none;flex-shrink:0}
 #status.show{display:block}
 #status .qr{display:flex;align-items:flex-start;gap:12px}
@@ -20,21 +24,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 #status .login{color:#07c160;font-size:15px;font-weight:500}
 #status .logout{color:#e67e22;font-size:15px}
 #status .error{color:#e74c3c;font-size:14px}
-#messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
-.msg{max-width:80%;padding:10px 14px;border-radius:8px;font-size:14px;line-height:1.5;word-break:break-all}
+#messages{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px}
+.msg{max-width:85%;padding:8px 12px;border-radius:8px;font-size:14px;line-height:1.5;word-break:break-all}
 .msg.incoming{background:#fff;align-self:flex-start;border-radius:8px 8px 8px 0}
 .msg.outgoing{background:#95ec69;align-self:flex-end;border-radius:8px 8px 0 8px}
 .msg .meta{font-size:11px;color:#999;margin-bottom:2px}
 .msg.outgoing .meta{color:#5a8a3c}
 .msg .text{color:#333}
 .empty{flex:1;display:flex;align-items:center;justify-content:center;color:#999;font-size:14px}
-.footer{background:#f7f7f7;padding:8px 12px;font-size:12px;color:#999;text-align:center;border-top:1px solid #ddd;flex-shrink:0}
+.footer{background:#f7f7f7;padding:6px 12px;font-size:12px;color:#999;text-align:center;border-top:1px solid #ddd;flex-shrink:0}
 </style>
 </head>
 <body>
 <div class="header">
-  <div class="dot off" id="dot"></div>
-  <span id="title">微信 Bot 消息面板</span>
+  <div class="left">
+    <div class="dot off" id="dot"></div>
+    <span id="title">微信 Bot 消息面板</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="badge" id="countBadge" style="display:none">0</span>
+    <button class="clear-btn" onclick="clearHistory()" title="清空本地历史">清空</button>
+  </div>
 </div>
 <div id="status"></div>
 <div id="messages">
@@ -48,6 +58,7 @@ const empty = document.getElementById("empty");
 const footer = document.getElementById("footer");
 const dot = document.getElementById("dot");
 const statusEl = document.getElementById("status");
+const countBadge = document.getElementById("countBadge");
 let count = 0;
 let wasLoggedIn = false;
 
@@ -55,7 +66,7 @@ function connect() {
   const ws = new WebSocket(`ws://${location.host}/ws`);
 
   ws.onopen = () => {
-    footer.textContent = "已连接 · 等待 Bot 启动";
+    footer.textContent = "已连接 · 等待同步";
     footer.style.color = "#07c160";
   };
 
@@ -70,10 +81,25 @@ function connect() {
     const msg = JSON.parse(e.data);
     if (msg.type === "status") {
       handleStatus(msg);
+    } else if (msg.type === "history") {
+      loadHistory(msg.messages);
     } else {
       addMessage(msg);
     }
   };
+}
+
+function loadHistory(messages) {
+  if (messages && messages.length > 0) {
+    // Clear existing messages, rebuild from history
+    msgs.innerHTML = "";
+    count = 0;
+    for (const m of messages) {
+      appendMsg(m);
+    }
+  }
+  footer.textContent = wasLoggedIn ? "已同步 · 监听消息中" : "已同步 · 等待登录";
+  footer.style.color = "#07c160";
 }
 
 function handleStatus(msg) {
@@ -126,9 +152,16 @@ function handleStatus(msg) {
 }
 
 function addMessage(msg) {
+  appendMsg(msg);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function appendMsg(msg) {
   if (empty) { empty.remove(); }
   count++;
-  document.getElementById("title").textContent = `微信 Bot 消息面板 (${count})`;
+  countBadge.textContent = count;
+  countBadge.style.display = "";
+  document.getElementById("title").textContent = "微信 Bot 消息";
 
   const div = document.createElement("div");
   div.className = `msg ${msg.type}`;
@@ -136,7 +169,12 @@ function addMessage(msg) {
     `<div class="meta">${msg.type === "incoming" ? "👤 " + msg.from : "🤖 Bot → " + msg.to} · ${msg.time}</div>` +
     `<div class="text">${escapeHtml(msg.text)}</div>`;
   msgs.appendChild(div);
-  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function clearHistory() {
+  msgs.innerHTML = `<div class="empty">历史已清空</div>`;
+  count = 0;
+  countBadge.style.display = "none";
 }
 
 function escapeHtml(s) {
