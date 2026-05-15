@@ -34,6 +34,7 @@ let history: ChatMessage[] = [];
 const clients = new Set<ServerWebSocket<unknown>>();
 let lastStatus: StatusMessage | null = null;
 let currentQrDataUrl: string | null = null;
+let isLoggedIn = false;
 
 function loadHistory(): ChatMessage[] {
   try {
@@ -57,7 +58,6 @@ function saveHistory() {
   }
 }
 
-// Load persisted messages on startup
 history = loadHistory();
 if (history.length > 0) {
   console.log(`[Store] 已加载 ${history.length} 条历史消息`);
@@ -73,9 +73,24 @@ function broadcastRaw(data: string) {
   }
 }
 
+function sendHistoryToClient(ws: ServerWebSocket<unknown>) {
+  sendJson(ws, { type: "history", messages: [...history] });
+}
+
 export function broadcast(msg: WSMessage): void {
   if (msg.type === "status") {
     lastStatus = msg;
+
+    if (msg.status === "login") {
+      isLoggedIn = true;
+      // Push history to all connected clients on login
+      for (const ws of clients) {
+        sendHistoryToClient(ws);
+      }
+    } else if (msg.status === "logout") {
+      isLoggedIn = false;
+    }
+
     if (msg.status === "scan" && msg.qrUrl) {
       const encoded = msg.qrUrl.replace(/^.*\/qrcode\//, "");
       const wechatUrl = decodeURIComponent(encoded);
@@ -91,6 +106,11 @@ export function broadcast(msg: WSMessage): void {
     history.push(msg);
     if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
     saveHistory();
+    // Only push to clients that have logged in
+    if (isLoggedIn) {
+      broadcastRaw(JSON.stringify(msg));
+      return;
+    }
   }
   broadcastRaw(JSON.stringify(msg));
 }
@@ -125,8 +145,8 @@ export function startWebServer(port: number): void {
     websocket: {
       open(ws) {
         clients.add(ws);
-        console.log(`[Web] 客户端连接 (历史消息 ${history.length} 条)`);
-        sendJson(ws, { type: "history", messages: [...history] });
+        console.log("[Web] 客户端连接");
+        // Only send status, NOT history until login
         if (lastStatus) {
           const msg = currentQrDataUrl && lastStatus.status === "scan"
             ? { ...lastStatus, qrDataUrl: currentQrDataUrl }
