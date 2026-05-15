@@ -11,7 +11,7 @@ export type ChatMessage = {
 
 export type StatusMessage = {
   type: "status";
-  status: "scan" | "login" | "logout" | "error";
+  status: "scan" | "login" | "logout" | "error" | "reconnecting";
   text: string;
   qrUrl?: string;
   time: string;

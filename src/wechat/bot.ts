@@ -3,11 +3,6 @@ import type { Wechaty, Contact } from "wechaty";
 import { createReplyLogic } from "../bot/reply";
 import type { ChatMessage, StatusMessage } from "../web/server";
 
-type Callbacks = {
-  onMessage?: (msg: ChatMessage) => void;
-  onStatus?: (msg: StatusMessage) => void;
-};
-
 function now() {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
 }
@@ -27,6 +22,8 @@ export function createBot(
 
   const bot = WechatyBuilder.build(options);
 
+  let loggedIn = false;
+
   bot.on("scan", (qrcode: string, status: ScanStatus) => {
     if (status === ScanStatus.Waiting || status === ScanStatus.Timeout) {
       const qrUrl = `https://wechaty.js.org/qrcode/${encodeURIComponent(qrcode)}`;
@@ -36,12 +33,14 @@ export function createBot(
   });
 
   bot.on("login", (user: Contact) => {
+    loggedIn = true;
     const text = `${user.name()} 登录成功`;
     console.log(`[Login] ${text}`);
     onStatus?.({ type: "status", status: "login", text, time: now() });
   });
 
   bot.on("logout", (user: Contact, reason?: string) => {
+    loggedIn = false;
     const text = `${user.name()} 已登出${reason ? `: ${reason}` : ""}`;
     console.log(`[Logout] ${text}`);
     onStatus?.({ type: "status", status: "logout", text, time: now() });
@@ -78,8 +77,17 @@ export function createBot(
   });
 
   bot.on("error", (error: Error) => {
-    console.error("[Error]", error.message);
-    onStatus?.({ type: "status", status: "error", text: error.message, time: now() });
+    const msg = error.message || String(error);
+    // Socket close during active session = connection drop, puppet will retry
+    if (msg.includes("socket connection was closed")) {
+      if (loggedIn) {
+        console.log("[Reconnect] 连接断开，尝试重连…");
+        onStatus?.({ type: "status", status: "reconnecting", text: "连接断开，自动重连中…", time: now() });
+      }
+      return;
+    }
+    console.error("[Error]", msg);
+    onStatus?.({ type: "status", status: "error", text: msg, time: now() });
   });
 
   return bot;

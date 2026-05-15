@@ -102,6 +102,11 @@ function handleStatus(msg) {
     footer.textContent = "已登出";
     footer.style.color = "#e67e22";
     statusEl.innerHTML = `<div class="logout">⚠️ ${msg.text} · ${msg.time}</div>`;
+  } else if (msg.status === "reconnecting") {
+    dot.className = "dot off";
+    footer.textContent = "重连中…";
+    footer.style.color = "#e67e22";
+    statusEl.innerHTML = `<div class="logout">🔄 ${msg.text} · ${msg.time}</div>`;
   } else if (msg.status === "error") {
     statusEl.innerHTML = `<div class="error">❌ ${msg.text} · ${msg.time}</div>`;
   }
