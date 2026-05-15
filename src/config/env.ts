@@ -32,6 +32,6 @@ export function loadEnv(): AppEnv {
     wechatAppId: Bun.env.WECHAT_APP_ID || undefined,
     botName: Bun.env.BOT_NAME ?? "wechat-chatbot",
     puppetToken: Bun.env.PUPPET_TOKEN || undefined,
-    puppetType: Bun.env.PUPPET_TYPE || "wechaty-puppet-padlocal",
+    puppetType: Bun.env.PUPPET_TYPE || "wechaty-puppet-wechat4u",
   };
 }
