@@ -19,15 +19,23 @@ export type StatusMessage = {
 export type WSMessage = ChatMessage | StatusMessage;
 
 const clients = new Set<ServerWebSocket<unknown>>();
+let lastStatus: StatusMessage | null = null;
 
-function send(ws: ServerWebSocket<unknown>, data: unknown) {
-  ws.send(JSON.stringify(data));
+function sendJson(ws: ServerWebSocket<unknown>, data: unknown) {
+  try {
+    ws.send(JSON.stringify(data));
+  } catch {
+    // client disconnected, will be cleaned up on close
+  }
 }
 
 export function broadcast(msg: WSMessage): void {
+  if (msg.type === "status") {
+    lastStatus = msg;
+  }
   const data = JSON.stringify(msg);
   for (const ws of clients) {
-    ws.send(data);
+    try { ws.send(data); } catch { /* ignore */ }
   }
 }
 
@@ -62,6 +70,10 @@ export function startWebServer(port: number): void {
       open(ws) {
         clients.add(ws);
         console.log("[Web] 客户端连接");
+        // Immediately send current status so new clients see the latest state
+        if (lastStatus) {
+          sendJson(ws, lastStatus);
+        }
       },
       close(ws) {
         clients.delete(ws);
