@@ -14,7 +14,8 @@ export function createBot(
   onMessage?: (msg: ChatMessage) => void,
   onStatus?: (msg: StatusMessage) => void,
 ): Wechaty {
-  const options: Record<string, unknown> = { puppet: puppetType };
+  const name = botName ?? "wechat-chatbot";
+  const options: Record<string, unknown> = { name, puppet: puppetType };
 
   if (puppetToken) {
     options.puppetOptions = { token: puppetToken };
@@ -23,9 +24,11 @@ export function createBot(
   const bot = WechatyBuilder.build(options);
 
   let loggedIn = false;
+  let hadScan = false;
 
   bot.on("scan", (qrcode: string, status: ScanStatus) => {
     if (status === ScanStatus.Waiting || status === ScanStatus.Timeout) {
+      hadScan = true;
       const qrUrl = `https://wechaty.js.org/qrcode/${encodeURIComponent(qrcode)}`;
       console.log(`[Scan] 扫码登录: ${qrUrl}`);
       onStatus?.({ type: "status", status: "scan", text: "请用微信扫码登录", qrUrl, time: now() });
@@ -34,7 +37,8 @@ export function createBot(
 
   bot.on("login", (user: Contact) => {
     loggedIn = true;
-    const text = `${user.name()} 登录成功`;
+    const tag = hadScan ? "" : " (会话恢复)";
+    const text = `${user.name()} 登录成功${tag}`;
     console.log(`[Login] ${text}`);
     onStatus?.({ type: "status", status: "login", text, time: now() });
   });
@@ -58,16 +62,16 @@ export function createBot(
     onMessage?.({
       type: "incoming",
       from,
-      to: botName ?? "wechat-chatbot",
+      to: name,
       text,
       time: now(),
     });
 
-    const reply = await createReplyLogic(text, botName ?? "wechat-chatbot");
+    const reply = await createReplyLogic(text, name);
 
     onMessage?.({
       type: "outgoing",
-      from: botName ?? "wechat-chatbot",
+      from: name,
       to: from,
       text: reply,
       time: now(),
@@ -78,7 +82,6 @@ export function createBot(
 
   bot.on("error", (error: Error) => {
     const msg = error.message || String(error);
-    // Socket close during active session = connection drop, puppet will retry
     if (msg.includes("socket connection was closed")) {
       if (loggedIn) {
         console.log("[Reconnect] 连接断开，尝试重连…");
