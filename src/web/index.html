@@ -14,7 +14,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 #status{background:#fff;padding:12px 16px;border-bottom:1px solid #e0e0e0;display:none;flex-shrink:0}
 #status.show{display:block}
 #status .qr{display:flex;align-items:flex-start;gap:12px}
-#status .qr iframe{width:200px;height:200px;border:1px solid #eee;border-radius:4px}
+#status .qr img{width:200px;height:200px;border:1px solid #eee;border-radius:4px}
 #status .qr .hint{font-size:13px;color:#666;line-height:1.6;padding-top:4px}
 #status .login{color:#07c160;font-size:15px;font-weight:500}
 #status .logout{color:#e67e22;font-size:15px}
@@ -48,7 +48,6 @@ const footer = document.getElementById("footer");
 const dot = document.getElementById("dot");
 const statusEl = document.getElementById("status");
 let count = 0;
-let loggedIn = false;
 
 function connect() {
   const ws = new WebSocket(`ws://${location.host}/ws`);
@@ -82,22 +81,23 @@ function handleStatus(msg) {
     dot.className = "dot off";
     footer.textContent = "等待扫码登录";
     footer.style.color = "#e67e22";
+    const qrImg = msg.qrDataUrl
+      ? `<img src="${msg.qrDataUrl}" alt="QR Code">`
+      : `<div style="width:200px;height:200px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px">QR 生成中…</div>`;
     statusEl.innerHTML = `
       <div class="qr">
-        <iframe src="${msg.qrUrl}" sandbox="allow-scripts allow-same-origin"></iframe>
+        ${qrImg}
         <div class="hint">
           <div style="font-weight:600;margin-bottom:6px">📱 请用微信扫码登录</div>
           <div style="color:#999;font-size:12px">${msg.time}</div>
         </div>
       </div>`;
   } else if (msg.status === "login") {
-    loggedIn = true;
     dot.className = "dot";
     footer.textContent = "已登录 · 监听消息中";
     footer.style.color = "#07c160";
     statusEl.innerHTML = `<div class="login">✅ ${msg.text} · ${msg.time}</div>`;
   } else if (msg.status === "logout") {
-    loggedIn = false;
     dot.className = "dot off";
     footer.textContent = "已登出";
     footer.style.color = "#e67e22";
@@ -122,7 +122,9 @@ function addMessage(msg) {
 }
 
 function escapeHtml(s) {
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
 }
 
 connect();

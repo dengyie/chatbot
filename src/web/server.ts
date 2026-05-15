@@ -1,4 +1,5 @@
 import type { ServerWebSocket } from "bun";
+import QRCode from "qrcode";
 
 export type ChatMessage = {
   type: "incoming" | "outgoing";
@@ -20,18 +21,33 @@ export type WSMessage = ChatMessage | StatusMessage;
 
 const clients = new Set<ServerWebSocket<unknown>>();
 let lastStatus: StatusMessage | null = null;
+let currentQrDataUrl: string | null = null;
 
 function sendJson(ws: ServerWebSocket<unknown>, data: unknown) {
-  try {
-    ws.send(JSON.stringify(data));
-  } catch {
-    // client disconnected, will be cleaned up on close
-  }
+  try { ws.send(JSON.stringify(data)); } catch { /* ignore */ }
 }
 
 export function broadcast(msg: WSMessage): void {
   if (msg.type === "status") {
     lastStatus = msg;
+    if (msg.status === "scan" && msg.qrUrl) {
+      // Extract the WeChat login URL from the Wechaty QR page URL
+      const encoded = msg.qrUrl.replace(/^.*\/qrcode\//, "");
+      const wechatUrl = decodeURIComponent(encoded);
+      // Generate QR code data URL for the WeChat login URL
+      QRCode.toDataURL(wechatUrl, { width: 200, margin: 1 })
+        .then((dataUrl) => {
+          currentQrDataUrl = dataUrl;
+          // Send updated status with qrDataUrl
+          const updated = { ...msg, qrDataUrl: dataUrl };
+          const data = JSON.stringify(updated);
+          for (const ws of clients) {
+            try { ws.send(data); } catch { /* ignore */ }
+          }
+        })
+        .catch((err) => console.error("[QR] 生成失败:", err));
+      // Also broadcast immediately without QR image for fast feedback
+    }
   }
   const data = JSON.stringify(msg);
   for (const ws of clients) {
@@ -70,9 +86,12 @@ export function startWebServer(port: number): void {
       open(ws) {
         clients.add(ws);
         console.log("[Web] 客户端连接");
-        // Immediately send current status so new clients see the latest state
         if (lastStatus) {
-          sendJson(ws, lastStatus);
+          // Send cached status, with QR data URL if available
+          const msg = currentQrDataUrl && lastStatus.status === "scan"
+            ? { ...lastStatus, qrDataUrl: currentQrDataUrl }
+            : lastStatus;
+          sendJson(ws, msg);
         }
       },
       close(ws) {
