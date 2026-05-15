@@ -6,175 +6,268 @@
 <title>微信 Bot 消息面板</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#ededed;height:100vh;display:flex;flex-direction:column}
-.header{background:#07c160;color:#fff;padding:10px 16px;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.header .left{display:flex;align-items:center;gap:8px}
-.header .dot{width:8px;height:8px;border-radius:50%;background:#fff;animation:pulse 2s infinite}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#e5e5e5;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* Header */
+.header{background:#2e2e2e;color:#fff;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;min-height:44px}
+.header .user-status{display:flex;align-items:center;gap:8px;font-size:13px}
+.header .dot{width:8px;height:8px;border-radius:50%;background:#4caf50;animation:pulse 2s infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.header .dot.off{background:#ff6b6b;animation:none}
-.header .badge{background:rgba(255,255,255,.25);font-size:12px;padding:2px 8px;border-radius:10px}
-.header .clear-btn{background:rgba(255,255,255,.2);border:none;color:#fff;font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer}
-.header .clear-btn:hover{background:rgba(255,255,255,.35)}
-#status{background:#fff;padding:12px 16px;border-bottom:1px solid #e0e0e0;display:none;flex-shrink:0}
-#status.show{display:block}
-#status .qr{display:flex;align-items:flex-start;gap:12px}
-#status .qr img{width:200px;height:200px;border:1px solid #eee;border-radius:4px}
-#status .qr .hint{font-size:13px;color:#666;line-height:1.6;padding-top:4px}
-#status .reconnect-banner{background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:#856404}
-#status .login{color:#07c160;font-size:15px;font-weight:500}
-#status .logout{color:#e67e22;font-size:15px}
-#status .error{color:#e74c3c;font-size:14px}
-#messages{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px}
-.msg{max-width:85%;padding:8px 12px;border-radius:8px;font-size:14px;line-height:1.5;word-break:break-all}
-.msg.incoming{background:#fff;align-self:flex-start;border-radius:8px 8px 8px 0}
-.msg.outgoing{background:#95ec69;align-self:flex-end;border-radius:8px 8px 0 8px}
-.msg .meta{font-size:11px;color:#999;margin-bottom:2px}
-.msg.outgoing .meta{color:#5a8a3c}
-.msg .text{color:#333}
-.empty{flex:1;display:flex;align-items:center;justify-content:center;color:#999;font-size:14px}
-.footer{background:#f7f7f7;padding:6px 12px;font-size:12px;color:#999;text-align:center;border-top:1px solid #ddd;flex-shrink:0}
+.header .dot.off{background:#ff5252;animation:none}
+.header .dot.reconnecting{background:#ff9800;animation:pulse 1s infinite}
+.header .stats{font-size:12px;color:#aaa}
+
+/* QR overlay */
+.qr-overlay{display:none;background:#fff;padding:16px;border-bottom:2px solid #07c160;text-align:center;flex-shrink:0}
+.qr-overlay.show{display:flex;justify-content:center;align-items:flex-start;gap:14px}
+.qr-overlay img{width:180px;height:180px;border:1px solid #eee;border-radius:4px}
+.qr-overlay .qr-hint{text-align:left;font-size:13px;color:#666;line-height:1.6;padding-top:8px}
+.qr-overlay .qr-banner{background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:13px;color:#856404;text-align:left}
+
+/* Main layout */
+.main{flex:1;display:flex;overflow:hidden}
+.sidebar{width:260px;background:#f0f0f0;border-right:1px solid #ddd;display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-header{background:#f7f7f7;padding:10px 14px;font-size:13px;font-weight:600;color:#333;border-bottom:1px solid #e0e0e0;display:flex;justify-content:space-between}
+.sidebar-header .count{color:#999;font-weight:400}
+.contact-list{flex:1;overflow-y:auto}
+.contact-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid #e8e8e8;display:flex;flex-direction:column;gap:2px;transition:background .15s}
+.contact-item:hover{background:#e0e0e0}
+.contact-item.active{background:#c8e6c9}
+.contact-item .name{font-size:14px;color:#333;font-weight:500}
+.contact-item .preview{font-size:12px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.contact-item .time{font-size:11px;color:#bbb}
+.contact-item .unread{background:#f44336;color:#fff;font-size:11px;padding:1px 6px;border-radius:10px;align-self:flex-end;min-width:20px;text-align:center}
+
+/* Chat area */
+.chat{flex:1;display:flex;flex-direction:column;background:#f5f5f5}
+.chat-header{background:#f7f7f7;padding:10px 16px;font-size:14px;font-weight:600;color:#333;border-bottom:1px solid #ddd;flex-shrink:0}
+.chat-messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.chat-empty{flex:1;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px}
+.msg-bubble{max-width:70%;padding:10px 14px;border-radius:8px;font-size:14px;line-height:1.5;word-break:break-all;position:relative}
+.msg-bubble.in{background:#fff;align-self:flex-start;border-radius:8px 8px 8px 0}
+.msg-bubble.out{background:#95ec69;align-self:flex-end;border-radius:8px 8px 0 8px}
+.msg-bubble .meta{font-size:11px;color:#999;margin-bottom:3px}
+.msg-bubble.out .meta{color:#5a8a3c}
+.msg-bubble .text{color:#333}
+
+.footer{background:#f0f0f0;padding:6px 14px;font-size:11px;color:#bbb;text-align:center;border-top:1px solid #ddd;flex-shrink:0}
 </style>
 </head>
 <body>
+
+<div class="qr-overlay" id="qrOverlay"></div>
+
 <div class="header">
-  <div class="left">
+  <div class="user-status">
     <div class="dot off" id="dot"></div>
-    <span id="title">微信 Bot 消息面板</span>
+    <span id="statusText">未连接</span>
   </div>
-  <div style="display:flex;align-items:center;gap:8px">
-    <span class="badge" id="countBadge" style="display:none">0</span>
-    <button class="clear-btn" onclick="clearHistory()" title="清空本地历史">清空</button>
+  <div class="stats">
+    <span id="msgCount">0 条消息</span> ·
+    <span id="contactCount">0 个联系人</span>
   </div>
 </div>
-<div id="status"></div>
-<div id="messages">
-  <div class="empty" id="empty">等待连接…</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span>联系人</span>
+      <span class="count" id="sidebarCount">0</span>
+    </div>
+    <div class="contact-list" id="contactList">
+      <div style="padding:40px;text-align:center;color:#bbb;font-size:13px">暂无联系人</div>
+    </div>
+  </div>
+  <div class="chat">
+    <div class="chat-header" id="chatTitle">选择一个联系人</div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-empty">← 选择联系人查看聊天记录</div>
+    </div>
+  </div>
 </div>
+
 <div class="footer" id="footer">未连接</div>
 
 <script>
-const msgs = document.getElementById("messages");
-const empty = document.getElementById("empty");
-const footer = document.getElementById("footer");
 const dot = document.getElementById("dot");
-const statusEl = document.getElementById("status");
-const countBadge = document.getElementById("countBadge");
-let count = 0;
+const statusText = document.getElementById("statusText");
+const msgCount = document.getElementById("msgCount");
+const contactCount = document.getElementById("contactCount");
+const footer = document.getElementById("footer");
+const qrOverlay = document.getElementById("qrOverlay");
+const contactList = document.getElementById("contactList");
+const sidebarCount = document.getElementById("sidebarCount");
+const chatTitle = document.getElementById("chatTitle");
+const chatMessages = document.getElementById("chatMessages");
+
+let allMessages = [];
+let contacts = new Map();
+let selectedContact = null;
 let wasLoggedIn = false;
+let loggedIn = false;
 
 function connect() {
   const ws = new WebSocket(`ws://${location.host}/ws`);
 
   ws.onopen = () => {
-    footer.textContent = "已连接 · 等待同步";
-    footer.style.color = "#07c160";
+    footer.textContent = "已连接";
+    footer.style.color = "#666";
   };
 
   ws.onclose = () => {
-    footer.textContent = "连接断开 · 3秒后重连";
-    footer.style.color = "#e74c3c";
+    footer.textContent = "断开 · 重连中…";
+    footer.style.color = "#f44336";
     dot.className = "dot off";
     setTimeout(connect, 3000);
   };
 
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
-    if (msg.type === "status") {
-      handleStatus(msg);
-    } else if (msg.type === "history") {
-      loadHistory(msg.messages);
-    } else {
-      addMessage(msg);
-    }
+    if (msg.type === "status") handleStatus(msg);
+    else if (msg.type === "history") loadHistory(msg.messages);
+    else addMessage(msg);
   };
 }
 
-function loadHistory(messages) {
-  if (messages && messages.length > 0) {
-    // Clear existing messages, rebuild from history
-    msgs.innerHTML = "";
-    count = 0;
-    for (const m of messages) {
-      appendMsg(m);
-    }
-  }
-  footer.textContent = wasLoggedIn ? "已同步 · 监听消息中" : "已同步 · 等待登录";
-  footer.style.color = "#07c160";
-}
-
 function handleStatus(msg) {
-  statusEl.classList.add("show");
-
   if (msg.status === "scan") {
+    loggedIn = false;
     dot.className = "dot off";
+    statusText.textContent = "等待扫码";
     footer.textContent = "等待扫码登录";
-    footer.style.color = "#e67e22";
+    footer.style.color = "#ff9800";
 
     const reBanner = wasLoggedIn
-      ? `<div class="reconnect-banner">⚠️ 连接已断开，请重新扫码</div>`
-      : "";
-
+      ? `<div class="qr-banner">⚠️ 连接已断开，请重新扫码</div>` : "";
     const qrImg = msg.qrDataUrl
-      ? `<img src="${msg.qrDataUrl}" alt="QR Code">`
-      : `<div style="width:200px;height:200px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px">QR 生成中…</div>`;
+      ? `<img src="${msg.qrDataUrl}" alt="QR">`
+      : `<div>QR 生成中…</div>`;
 
-    statusEl.innerHTML = `
-      ${reBanner}
-      <div class="qr">
-        ${qrImg}
-        <div class="hint">
-          <div style="font-weight:600;margin-bottom:6px">📱 请用微信扫码登录</div>
-          <div style="color:#999;font-size:12px">${msg.time}</div>
-        </div>
-      </div>`;
-
+    qrOverlay.innerHTML = `${reBanner}<div style="display:flex;justify-content:center;align-items:flex-start;gap:14px">${qrImg}<div class="qr-hint"><div style="font-weight:600;margin-bottom:6px">📱 请用微信扫码登录</div><div style="font-size:12px;color:#999">${msg.time}</div></div></div>`;
+    qrOverlay.classList.add("show");
     wasLoggedIn = false;
   } else if (msg.status === "login") {
+    loggedIn = true;
     wasLoggedIn = true;
     dot.className = "dot";
-    footer.textContent = "已登录 · 监听消息中";
-    footer.style.color = "#07c160";
-    statusEl.innerHTML = `<div class="login">✅ ${msg.text} · ${msg.time}</div>`;
+    statusText.textContent = msg.text;
+    footer.textContent = "已登录 · 监听中";
+    footer.style.color = "#4caf50";
+    qrOverlay.classList.remove("show");
   } else if (msg.status === "logout") {
-    wasLoggedIn = false;
+    loggedIn = false;
     dot.className = "dot off";
+    statusText.textContent = msg.text;
     footer.textContent = "已登出";
-    footer.style.color = "#e67e22";
-    statusEl.innerHTML = `<div class="logout">⚠️ ${msg.text} · ${msg.time}</div>`;
+    footer.style.color = "#ff9800";
   } else if (msg.status === "reconnecting") {
-    dot.className = "dot off";
+    dot.className = "dot reconnecting";
+    statusText.textContent = msg.text;
     footer.textContent = "重连中…";
-    footer.style.color = "#e67e22";
-    statusEl.innerHTML = `<div class="reconnect-banner">🔄 ${msg.text} · ${msg.time}</div>`;
+    footer.style.color = "#ff9800";
   } else if (msg.status === "error") {
-    statusEl.innerHTML = `<div class="error">❌ ${msg.text} · ${msg.time}</div>`;
+    footer.textContent = "错误: " + msg.text;
+    footer.style.color = "#f44336";
+  }
+}
+
+function loadHistory(messages) {
+  allMessages = messages;
+  rebuildContacts();
+  if (selectedContact) {
+    renderChat(selectedContact);
   }
 }
 
 function addMessage(msg) {
-  appendMsg(msg);
-  msgs.scrollTop = msgs.scrollHeight;
+  allMessages.push(msg);
+  rebuildContacts();
+  // If viewing this contact or bot's response to current contact, update
+  const contactName = msg.type === "incoming" ? msg.from : msg.to;
+  if (selectedContact && selectedContact === contactName) {
+    renderChat(selectedContact);
+  }
 }
 
-function appendMsg(msg) {
-  if (empty) { empty.remove(); }
-  count++;
-  countBadge.textContent = count;
-  countBadge.style.display = "";
-  document.getElementById("title").textContent = "微信 Bot 消息";
-
-  const div = document.createElement("div");
-  div.className = `msg ${msg.type}`;
-  div.innerHTML =
-    `<div class="meta">${msg.type === "incoming" ? "👤 " + msg.from : "🤖 Bot → " + msg.to} · ${msg.time}</div>` +
-    `<div class="text">${escapeHtml(msg.text)}</div>`;
-  msgs.appendChild(div);
+function getContactName(msg) {
+  return msg.type === "incoming" ? msg.from : msg.to;
 }
 
-function clearHistory() {
-  msgs.innerHTML = `<div class="empty">历史已清空</div>`;
-  count = 0;
-  countBadge.style.display = "none";
+function rebuildContacts() {
+  contacts.clear();
+  for (const m of allMessages) {
+    const name = getContactName(m);
+    if (!contacts.has(name)) {
+      contacts.set(name, { name, lastMsg: m.text, lastTime: m.time, count: 0 });
+    }
+    const c = contacts.get(name);
+    c.count++;
+    c.lastMsg = m.text;
+    c.lastTime = m.time;
+  }
+
+  // Render sidebar
+  if (contacts.size === 0) {
+    contactList.innerHTML = '<div style="padding:40px;text-align:center;color:#bbb;font-size:13px">暂无联系人</div>';
+  } else {
+    contactList.innerHTML = "";
+    // Sort by last message time (most recent first)
+    const sorted = [...contacts.values()].sort((a, b) => {
+      return allMessages.filter(m => getContactName(m) === b.name).length -
+             allMessages.filter(m => getContactName(m) === a.name).length;
+    }).reverse();
+
+    for (const c of sorted) {
+      const div = document.createElement("div");
+      div.className = "contact-item" + (selectedContact === c.name ? " active" : "");
+      div.innerHTML = `
+        <div class="name">${escapeHtml(c.name)}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="preview">${escapeHtml(c.lastMsg).substring(0, 20)}</div>
+          <div class="time">${c.lastTime}</div>
+        </div>`;
+      div.onclick = () => selectContact(c.name);
+      contactList.appendChild(div);
+    }
+  }
+
+  sidebarCount.textContent = contacts.size;
+  contactCount.textContent = contacts.size + " 个联系人";
+  msgCount.textContent = allMessages.length + " 条消息";
+  if (allMessages.length > 0) {
+    document.getElementById("statusText").textContent = allMessages.length + " 条消息";
+  }
+}
+
+function selectContact(name) {
+  selectedContact = name;
+  renderChat(name);
+
+  // Update active state in sidebar
+  document.querySelectorAll(".contact-item").forEach(el => {
+    el.classList.toggle("active", el.querySelector(".name")?.textContent === name);
+  });
+}
+
+function renderChat(name) {
+  chatTitle.textContent = name;
+  const msgs = allMessages.filter(m => getContactName(m) === name);
+
+  if (msgs.length === 0) {
+    chatMessages.innerHTML = '<div class="chat-empty">暂无聊天记录</div>';
+    return;
+  }
+
+  chatMessages.innerHTML = msgs.map(m => {
+    const cls = m.type === "incoming" ? "in" : "out";
+    const who = m.type === "incoming" ? "👤 " + m.from : "🤖 Bot";
+    return `<div class="msg-bubble ${cls}">
+      <div class="meta">${who} · ${m.time}</div>
+      <div class="text">${escapeHtml(m.text)}</div>
+    </div>`;
+  }).join("");
+
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function escapeHtml(s) {
