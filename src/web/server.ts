@@ -1,5 +1,10 @@
 import type { ServerWebSocket } from "bun";
 import QRCode from "qrcode";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+
+const DATA_DIR = join(import.meta.dir, "../../data");
+const MESSAGES_FILE = join(DATA_DIR, "messages.json");
 
 export type ChatMessage = {
   type: "incoming" | "outgoing";
@@ -24,11 +29,39 @@ export type HistorySync = {
   messages: ChatMessage[];
 };
 
-const MAX_HISTORY = 200;
-const history: ChatMessage[] = [];
+const MAX_HISTORY = 500;
+let history: ChatMessage[] = [];
 const clients = new Set<ServerWebSocket<unknown>>();
 let lastStatus: StatusMessage | null = null;
 let currentQrDataUrl: string | null = null;
+
+function loadHistory(): ChatMessage[] {
+  try {
+    if (existsSync(MESSAGES_FILE)) {
+      const raw = readFileSync(MESSAGES_FILE, "utf-8");
+      const data = JSON.parse(raw);
+      if (Array.isArray(data)) return data.slice(-MAX_HISTORY);
+    }
+  } catch (err) {
+    console.error("[Store] 加载历史失败:", err);
+  }
+  return [];
+}
+
+function saveHistory() {
+  try {
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(MESSAGES_FILE, JSON.stringify(history, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[Store] 保存历史失败:", err);
+  }
+}
+
+// Load persisted messages on startup
+history = loadHistory();
+if (history.length > 0) {
+  console.log(`[Store] 已加载 ${history.length} 条历史消息`);
+}
 
 function sendJson(ws: ServerWebSocket<unknown>, data: unknown) {
   try { ws.send(JSON.stringify(data)); } catch { /* ignore */ }
@@ -56,7 +89,8 @@ export function broadcast(msg: WSMessage): void {
   }
   if (msg.type === "incoming" || msg.type === "outgoing") {
     history.push(msg);
-    if (history.length > MAX_HISTORY) history.shift();
+    if (history.length > MAX_HISTORY) history.splice(0, history.length - MAX_HISTORY);
+    saveHistory();
   }
   broadcastRaw(JSON.stringify(msg));
 }
@@ -92,7 +126,6 @@ export function startWebServer(port: number): void {
       open(ws) {
         clients.add(ws);
         console.log(`[Web] 客户端连接 (历史消息 ${history.length} 条)`);
-        // Send history first, then current status
         sendJson(ws, { type: "history", messages: [...history] });
         if (lastStatus) {
           const msg = currentQrDataUrl && lastStatus.status === "scan"
