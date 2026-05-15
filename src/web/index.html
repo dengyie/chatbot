@@ -16,6 +16,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 #status .qr{display:flex;align-items:flex-start;gap:12px}
 #status .qr img{width:200px;height:200px;border:1px solid #eee;border-radius:4px}
 #status .qr .hint{font-size:13px;color:#666;line-height:1.6;padding-top:4px}
+#status .reconnect-banner{background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:13px;color:#856404}
 #status .login{color:#07c160;font-size:15px;font-weight:500}
 #status .logout{color:#e67e22;font-size:15px}
 #status .error{color:#e74c3c;font-size:14px}
@@ -48,6 +49,7 @@ const footer = document.getElementById("footer");
 const dot = document.getElementById("dot");
 const statusEl = document.getElementById("status");
 let count = 0;
+let wasLoggedIn = false;
 
 function connect() {
   const ws = new WebSocket(`ws://${location.host}/ws`);
@@ -81,10 +83,17 @@ function handleStatus(msg) {
     dot.className = "dot off";
     footer.textContent = "等待扫码登录";
     footer.style.color = "#e67e22";
+
+    const reBanner = wasLoggedIn
+      ? `<div class="reconnect-banner">⚠️ 连接已断开，请重新扫码</div>`
+      : "";
+
     const qrImg = msg.qrDataUrl
       ? `<img src="${msg.qrDataUrl}" alt="QR Code">`
       : `<div style="width:200px;height:200px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px">QR 生成中…</div>`;
+
     statusEl.innerHTML = `
+      ${reBanner}
       <div class="qr">
         ${qrImg}
         <div class="hint">
@@ -92,12 +101,16 @@ function handleStatus(msg) {
           <div style="color:#999;font-size:12px">${msg.time}</div>
         </div>
       </div>`;
+
+    wasLoggedIn = false;
   } else if (msg.status === "login") {
+    wasLoggedIn = true;
     dot.className = "dot";
     footer.textContent = "已登录 · 监听消息中";
     footer.style.color = "#07c160";
     statusEl.innerHTML = `<div class="login">✅ ${msg.text} · ${msg.time}</div>`;
   } else if (msg.status === "logout") {
+    wasLoggedIn = false;
     dot.className = "dot off";
     footer.textContent = "已登出";
     footer.style.color = "#e67e22";
@@ -106,7 +119,7 @@ function handleStatus(msg) {
     dot.className = "dot off";
     footer.textContent = "重连中…";
     footer.style.color = "#e67e22";
-    statusEl.innerHTML = `<div class="logout">🔄 ${msg.text} · ${msg.time}</div>`;
+    statusEl.innerHTML = `<div class="reconnect-banner">🔄 ${msg.text} · ${msg.time}</div>`;
   } else if (msg.status === "error") {
     statusEl.innerHTML = `<div class="error">❌ ${msg.text} · ${msg.time}</div>`;
   }
